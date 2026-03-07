@@ -4,9 +4,12 @@ const { Client, Collection, GatewayIntentBits, REST, Routes } = require('discord
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 client.commands = new Collection();
-const commandsArray = [];
 
-// 1. Carregamento Automático de Comandos
+const globalCommands = [];
+const privateCommands = [];
+const CENTRAL_GUILD_ID = '1479645437097934881'; // Substitua pelo ID correto se houver erro de digitação
+
+// Carregamento de comandos
 const loadCommands = (dir) => {
     const files = fs.readdirSync(dir);
     for (const file of files) {
@@ -17,7 +20,13 @@ const loadCommands = (dir) => {
             const command = require(filePath);
             if ('data' in command && 'execute' in command) {
                 client.commands.set(command.data.name, command);
-                commandsArray.push(command.data.toJSON()); // Prepara para o registro
+                
+                // Se o comando tiver a propriedade "adminOnly", vai para a lista privada
+                if (command.adminOnly) {
+                    privateCommands.push(command.data.toJSON());
+                } else {
+                    globalCommands.push(command.data.toJSON());
+                }
             }
         }
     }
@@ -25,35 +34,28 @@ const loadCommands = (dir) => {
 
 loadCommands(path.join(__dirname, 'commands'));
 
-// 2. Registro Automático (Deploy) ao Iniciar
 client.once('ready', async (c) => {
-    console.log(`✅ Logado como ${c.user.tag}`);
-    
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+    
     try {
-        console.log('⏳ Registrando comandos slash...');
-        await rest.put(
-            Routes.applicationCommands(c.user.id),
-            { body: commandsArray },
-        );
-        console.log('🚀 Comandos registrados globalmente!');
+        // Registra comandos GLOBAIS (aparecem em todos os servidores)
+        await rest.put(Routes.applicationCommands(c.user.id), { body: globalCommands });
+
+        // Registra comandos PRIVADOS (apenas no seu servidor central)
+        await rest.put(Routes.applicationGuildCommands(c.user.id, CENTRAL_GUILD_ID), { body: privateCommands });
+
+        console.log(`✅ ${c.user.tag} online. Comandos globais e privados registrados!`);
     } catch (error) {
-        console.error('❌ Erro ao registrar comandos:', error);
+        console.error('❌ Erro no registro:', error);
     }
 });
 
-// 3. Execução de Comandos
+// Listener de interação (mesmo código anterior...)
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
-
-    try {
-        await command.execute(interaction);
-    } catch (error) {
-        console.error(error);
-        await interaction.reply({ content: 'Erro no comando!', ephemeral: true });
-    }
+    try { await command.execute(interaction); } catch (e) { console.error(e); }
 });
 
 client.login(process.env.DISCORD_TOKEN);
