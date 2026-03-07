@@ -1,17 +1,13 @@
 const fs = require('node:fs');
 const crypto = require('crypto');
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 const RAID_DB = '/app/data/antiraid.json';
 const BLIND_DB = '/app/data/blindagem.json';
 const PRIVADO_DB = '/app/data/privado.json';
 const KEYS_DB = '/app/data/keys.json';
 
-const caches = {
-    msg: new Map(),
-    ch: new Map(),
-    join: new Map()
-};
+const caches = { msg: new Map(), ch: new Map(), join: new Map() };
 
 const sendLog = (guild, text) => {
     if (!fs.existsSync(RAID_DB)) return;
@@ -94,30 +90,46 @@ module.exports = {
         const cfg = config[interaction.guildId];
         if (!cfg) return;
 
+        // SE CLICAR EM GERAR
         if (interaction.customId === 'gerar_chave') {
             const ultimosDois = interaction.user.id.slice(-2);
             const aleatorio = crypto.randomBytes(4).toString('hex').toUpperCase();
             const chave = `CHAVE-${ultimosDois}${aleatorio}`;
+
             const keys = fs.existsSync(KEYS_DB) ? JSON.parse(fs.readFileSync(KEYS_DB)) : {};
             keys[interaction.user.id] = chave;
             fs.writeFileSync(KEYS_DB, JSON.stringify(keys));
+
             const logChan = interaction.guild.channels.cache.get(cfg.canalChaves);
             logChan?.send(`🔑 Chave de **${interaction.user.tag}**: \`${chave}\``);
+
+            // Troca o botão para o usuário (Episódio de interação)
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('abrir_modal').setLabel('Inserir Chave').setStyle(ButtonStyle.Success)
+            );
+
+            await interaction.reply({ content: '🔑 Sua chave foi enviada ao canal de chaves. Clique abaixo para digitar.', components: [row], ephemeral: true });
+        }
+
+        // SE CLICAR EM INSERIR (O BOTÃO QUE APARECEU NO EPHEMERAL)
+        if (interaction.customId === 'abrir_modal') {
             const modal = new ModalBuilder().setCustomId('modal_chave').setTitle('Verificação');
-            const input = new TextInputBuilder().setCustomId('input_chave').setLabel('Sua Chave').setStyle(TextInputStyle.Short).setRequired(true);
+            const input = new TextInputBuilder().setCustomId('input_chave').setLabel('Insira a Chave').setStyle(TextInputStyle.Short).setRequired(true);
             modal.addComponents(new ActionRowBuilder().addComponents(input));
             await interaction.showModal(modal);
         }
 
+        // SUBMIT DO MODAL
         if (interaction.isModalSubmit() && interaction.customId === 'modal_chave') {
             const keys = fs.existsSync(KEYS_DB) ? JSON.parse(fs.readFileSync(KEYS_DB, 'utf8')) : {};
             const digitada = interaction.fields.getTextInputValue('input_chave');
+            
             if (digitada === keys[interaction.user.id]) {
                 const member = await interaction.guild.members.fetch(interaction.user.id);
                 await member.roles.add(cfg.roleId);
                 delete keys[interaction.user.id];
                 fs.writeFileSync(KEYS_DB, JSON.stringify(keys));
-                await interaction.reply({ content: '✅ Acesso liberado!', ephemeral: true });
+                await interaction.reply({ content: '✅ Acesso liberado! O painel de verificação sumirá para você.', ephemeral: true });
             } else {
                 await interaction.reply({ content: '❌ Chave incorreta.', ephemeral: true });
             }
