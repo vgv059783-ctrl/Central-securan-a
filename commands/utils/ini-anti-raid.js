@@ -1,46 +1,25 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const fs = require('node:fs');
-const path = require('node:path');
-
-// Caminho do volume no Railway
-const dbPath = '/app/data/antiraid.json';
+const DB_PATH = '/app/data/antiraid.json';
 
 module.exports = {
-    // Removido o adminOnly para aparecer em todos os servers
     data: new SlashCommandBuilder()
         .setName('ini-anti-raid')
-        .setDescription('Configura a proteção contra entradas em massa neste servidor')
-        .addStringOption(opt => opt.setName('status').setDescription('Ligar ou Desligar').addChoices(
-            { name: 'Ligar', value: 'on' },
-            { name: 'Desligar', value: 'off' }
-        ).setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator), // Apenas ADMs do server podem usar
+        .setDescription('Configura o sistema anti-raid e logs')
+        .addStringOption(opt => opt.setName('status').setDescription('Ligar/Desligar').addChoices({name:'Ligar',value:'on'},{name:'Desligar',value:'off'}).setRequired(true))
+        .addChannelOption(opt => opt.setName('logs').setDescription('Canal de avisos do bot').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     async execute(interaction) {
-        let config = {};
-
-        // Tenta ler o arquivo se ele existir
-        if (fs.existsSync(dbPath)) {
-            try {
-                config = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-            } catch (e) {
-                console.error("Erro ao ler DB:", e);
-            }
-        }
-
-        // Salva a config específica deste servidor
+        let config = fs.existsSync(DB_PATH) ? JSON.parse(fs.readFileSync(DB_PATH)) : {};
         const status = interaction.options.getString('status');
-        config[interaction.guildId] = { enabled: status === 'on' };
+        const logChannel = interaction.options.getChannel('logs');
 
-        // Grava no volume /app/data
-        try {
-            fs.writeFileSync(dbPath, JSON.stringify(config, null, 2));
-            await interaction.reply({ 
-                content: `🛡️ O sistema Anti-Raid foi **${status === 'on' ? 'ATIVADO' : 'DESATIVADO'}** neste servidor!`, 
-                ephemeral: true 
-            });
-        } catch (e) {
-            console.error("Erro ao salvar DB:", e);
-            await interaction.reply({ content: 'Erro ao salvar configuração no volume.', ephemeral: true });
-        }
+        config[interaction.guildId] = { 
+            enabled: status === 'on', 
+            logChannelId: logChannel.id 
+        };
+
+        fs.writeFileSync(DB_PATH, JSON.stringify(config, null, 2));
+        await interaction.reply({ content: `🛡️ Anti-Raid ${status === 'on' ? 'ON' : 'OFF'}. Logs em: <#${logChannel.id}>`, ephemeral: true });
     }
 };
