@@ -15,38 +15,36 @@ module.exports = {
         const chavesChan = interaction.options.getChannel('canal_chaves');
         const guild = interaction.guild;
 
-        // 1. Criar ou achar cargo "Confirmado"
         let role = guild.roles.cache.find(r => r.name === 'Confirmado');
-        if (!role) {
-            role = await guild.roles.create({ name: 'Confirmado', reason: 'Sistema de Acesso PV' });
-        }
+        if (!role) role = await guild.roles.create({ name: 'Confirmado', reason: 'Sistema de Acesso PV' });
 
-        // 2. Salvar configs no volume
-        const cfgPath = '/app/data/privado.json';
-        const config = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath)) : {};
-        config[guild.id] = { canalChaves: chavesChan.id, roleId: role.id };
-        fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2));
+        const config = fs.existsSync('/app/data/privado.json') ? JSON.parse(fs.readFileSync('/app/data/privado.json')) : {};
+        config[guild.id] = { canalChaves: chavesChan.id, roleId: role.id, canalPainelId: painelChan.id };
+        fs.writeFileSync('/app/data/privado.json', JSON.stringify(config, null, 2));
 
-        // 3. Privar canais (menos o do painel)
+        // Privar todos os canais, mas manter o do Painel visível para everyone
         guild.channels.cache.forEach(async (ch) => {
-            if (ch.id === painelChan.id) return;
             try {
-                await ch.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: false });
-                await ch.permissionOverwrites.edit(role, { ViewChannel: true });
-            } catch (e) { console.error(`Erro no canal ${ch.name}`); }
+                if (ch.id === painelChan.id) {
+                    await ch.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: true, SendMessages: false });
+                    await ch.permissionOverwrites.edit(role, { ViewChannel: false }); // Esconde de quem já confirmou
+                } else {
+                    await ch.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: false });
+                    await ch.permissionOverwrites.edit(role, { ViewChannel: true });
+                }
+            } catch (e) { console.error(`Erro ao privar canal ${ch.name}`); }
         });
 
-        // 4. Enviar Painel
         const embed = new EmbedBuilder()
             .setTitle('🔐 Verificação de Acesso')
-            .setDescription('Clique no botão abaixo para gerar sua chave de acesso e liberar o servidor.')
+            .setDescription('Clique no botão abaixo para gerar sua chave e liberar o acesso aos canais.')
             .setColor('#2b2d31');
 
-        const btn = new ActionRowBuilder().addComponents(
+        const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('gerar_chave').setLabel('Gerar Chave').setStyle(ButtonStyle.Primary)
         );
 
-        await painelChan.send({ embeds: [embed], components: [btn] });
-        await interaction.editReply('✅ Sistema configurado e canais privados!');
+        await painelChan.send({ embeds: [embed], components: [row] });
+        await interaction.editReply('✅ Sistema configurado! Painel público para novos usuários e privado para confirmados.');
     }
 };
