@@ -5,7 +5,7 @@ const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, Button
 const RAID_DB = '/app/data/antiraid.json';
 const BLIND_DB = '/app/data/blindagem.json';
 const PRIVADO_DB = '/app/data/privado.json';
-const KEYS_DB = '/app/data/keys.json';
+const KEYS_DB = '/app/data/keys.json';::
 
 const caches = { msg: new Map(), ch: new Map(), join: new Map() };
 
