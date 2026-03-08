@@ -47,7 +47,7 @@ client.once('ready', async (c) => {
 client.on('messageCreate', m => protecao.verificarSpam(m));
 client.on('channelCreate', ch => protecao.verificarCriacaoCanal(ch));
 client.on('channelDelete', ch => protecao.verificarExclusaoCanal(ch));
-client.on('guildMemberAdd', mem => protecao.verificarRaidJoin(mem));}
+client.on('guildMemberAdd', mem => protecao.verificarRaidJoin(mem));
 
 client.on('interactionCreate', async (i) => {
     if (i.isChatInputCommand()) {
