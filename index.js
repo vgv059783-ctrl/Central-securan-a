@@ -2,6 +2,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, GatewayIntentBits, REST, Routes } = require('discord.js');
 const protecao = require('./protecao.js');
+const express = require('express'); // 1. Importa o Express
+
+// --- CONFIGURAÇÃO DO SERVIDOR PARA O RENDER ---
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+    res.send('Bot Online!');
+});
+
+app.listen(port, () => {
+    console.log(`🌐 Servidor HTTP rodando na porta ${port}`);
+});
+// ----------------------------------------------
 
 const client = new Client({ 
     intents: [
